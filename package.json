@@ -13,6 +13,8 @@
   "exports": {
     ".": "./build/index.js",
     "./otel": "./build/src/otel.js",
+    "./drivers/knex_adapter": "./build/src/adapters/knex.js",
+    "./drivers/kysely_adapter": "./build/src/adapters/kysely.js",
     "./queue_provider": "./build/providers/queue_provider.js",
     "./commands/*": "./build/commands/*.js",
     "./commands": "./build/commands/main.js",
@@ -36,7 +38,7 @@
     "version": "npm run build"
   },
   "dependencies": {
-    "@boringnode/queue": "^0.8.0"
+    "@boringnode/queue": "^0.9.0"
   },
   "devDependencies": {
     "@adonisjs/assembler": "^8.5.2",

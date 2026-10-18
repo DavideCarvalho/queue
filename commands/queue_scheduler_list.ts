@@ -21,6 +21,9 @@ export default class QueueSchedulerList extends BaseCommand {
   @flags.string({ description: 'Filter by status (active, paused)', alias: 's' })
   declare status?: string
 
+  @flags.string({ description: 'Name of the adapter storing the schedules', alias: 'a' })
+  declare adapter?: string
+
   async run() {
     const { Schedule } = await import('@boringnode/queue')
 
@@ -29,7 +32,7 @@ export default class QueueSchedulerList extends BaseCommand {
       options.status = this.status
     }
 
-    const schedules = await Schedule.list(options)
+    const schedules = await Schedule.list(options, { adapter: this.adapter })
 
     if (schedules.length === 0) {
       this.logger.info('No schedules found')

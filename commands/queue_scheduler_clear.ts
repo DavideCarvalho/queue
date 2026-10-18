@@ -7,7 +7,7 @@
  * file that was distributed with this source code.
  */
 
-import { BaseCommand } from '@adonisjs/core/ace'
+import { BaseCommand, flags } from '@adonisjs/core/ace'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 
 export default class QueueSchedulerClear extends BaseCommand {
@@ -18,10 +18,13 @@ export default class QueueSchedulerClear extends BaseCommand {
     startApp: true,
   }
 
+  @flags.string({ description: 'Name of the adapter storing the schedules', alias: 'a' })
+  declare adapter?: string
+
   async run() {
     const { Schedule } = await import('@boringnode/queue')
 
-    const schedules = await Schedule.list()
+    const schedules = await Schedule.list({}, { adapter: this.adapter })
 
     if (schedules.length === 0) {
       this.logger.info('No schedules to clear')

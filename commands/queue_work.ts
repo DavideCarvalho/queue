@@ -27,6 +27,9 @@ export default class QueueWork extends BaseCommand {
   @flags.number({ description: 'Number of jobs to process concurrently', alias: 'c' })
   declare concurrency?: number
 
+  @flags.string({ description: 'Name of the adapter to process jobs from', alias: 'a' })
+  declare adapter?: string
+
   async run() {
     const { Worker } = await import('@boringnode/queue')
     const config = this.app.config.get<QueueConfig>('queue')
@@ -58,6 +61,7 @@ export default class QueueWork extends BaseCommand {
       worker: {
         ...config.worker,
         ...(this.concurrency !== undefined ? { concurrency: this.concurrency } : {}),
+        ...(this.adapter !== undefined ? { adapter: this.adapter } : {}),
       },
     } satisfies QueueManagerConfig
 

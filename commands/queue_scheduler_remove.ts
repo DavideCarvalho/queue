@@ -7,7 +7,7 @@
  * file that was distributed with this source code.
  */
 
-import { args, BaseCommand } from '@adonisjs/core/ace'
+import { args, BaseCommand, flags } from '@adonisjs/core/ace'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 
 export default class QueueSchedulerRemove extends BaseCommand {
@@ -21,10 +21,13 @@ export default class QueueSchedulerRemove extends BaseCommand {
   @args.string({ description: 'ID of the schedule to remove' })
   declare id: string
 
+  @flags.string({ description: 'Name of the adapter storing the schedules', alias: 'a' })
+  declare adapter?: string
+
   async run() {
     const { Schedule } = await import('@boringnode/queue')
 
-    const schedule = await Schedule.find(this.id)
+    const schedule = await Schedule.find(this.id, { adapter: this.adapter })
 
     if (!schedule) {
       this.logger.error(`Schedule "${this.id}" not found`)

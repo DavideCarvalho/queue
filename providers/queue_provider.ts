@@ -8,7 +8,7 @@
  */
 
 import '../src/types/extended.js'
-import { resolveAdapters, resolveJobFactory } from '../src/utils.js'
+import { resolveAdapters, resolveHotReload, resolveJobFactory } from '../src/utils.js'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { QueueConfig } from '../src/types/main.js'
 
@@ -35,6 +35,7 @@ export default class QueueProvider {
         autoLoadJobs: false,
         adapters: resolvedAdapters,
         jobFactory,
+        hotReload: resolveHotReload(config),
         logger: config.logger ?? (logger as any),
       })
 

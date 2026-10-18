@@ -39,3 +39,12 @@ export async function resolveAdapters(
 export function resolveJobFactory(config: QueueConfig, app: ApplicationService): JobFactory {
   return config.jobFactory ?? ((jobClass: any) => app.container.make(jobClass))
 }
+
+/**
+ * Jobs reload on every execution when the process runs under Hot Hook,
+ * as with `node ace serve --hmr` or `node ace queue:work --hmr`. The
+ * `hotReload` config option takes precedence.
+ */
+export function resolveHotReload(config: QueueConfig): boolean {
+  return config.hotReload ?? (import.meta as ImportMeta & { hot?: object }).hot !== undefined
+}

@@ -7,8 +7,10 @@
  * file that was distributed with this source code.
  */
 
+import { fork } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { flags, BaseCommand } from '@adonisjs/core/ace'
-import { resolveAdapters, resolveJobFactory } from '../src/utils.js'
+import { resolveAdapters, resolveHotReload, resolveJobFactory } from '../src/utils.js'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { QueueConfig, QueueManagerConfig } from '../src/types/main.js'
 
@@ -33,11 +35,18 @@ export default class QueueWork extends BaseCommand {
   @flags.string({ description: 'Name of the adapter to process jobs from', alias: 'a' })
   declare adapter?: string
 
+  @flags.boolean({ description: 'Reload jobs on file change, using hot-hook (development only)' })
+  declare hmr?: boolean
+
   async run() {
     if (this.queue && this.allQueues) {
       this.logger.error('Cannot use --queue and --all-queues flags together. Choose one of them')
       this.exitCode = 1
       return
+    }
+
+    if (this.hmr) {
+      return this.#runWithHmr()
     }
 
     const { Worker } = await import('@boringnode/queue')
@@ -70,6 +79,7 @@ export default class QueueWork extends BaseCommand {
       autoLoadJobs: false,
       adapters: resolvedAdapters,
       jobFactory,
+      hotReload: resolveHotReload(config),
       logger: config.logger ?? logger,
       worker: {
         ...config.worker,
@@ -97,5 +107,67 @@ export default class QueueWork extends BaseCommand {
     } finally {
       await this.terminate()
     }
+  }
+
+  /**
+   * Runs the worker in a child process loaded with hot-hook, the way
+   * `node ace serve --hmr` runs the HTTP server. A changed job reloads on
+   * its next execution. A change hot-hook cannot reload, such as a config
+   * file, restarts the child once its running jobs are finalized.
+   */
+  async #runWithHmr() {
+    const args = ['queue:work']
+    if (this.queue !== undefined) args.push(`--queue=${this.queue}`)
+    if (this.allQueues) args.push('--all-queues')
+    if (this.concurrency !== undefined) args.push(`--concurrency=${this.concurrency}`)
+    if (this.adapter !== undefined) args.push(`--adapter=${this.adapter}`)
+
+    let restarting = false
+
+    const exitCode = await new Promise<number>((resolve) => {
+      const start = () => {
+        const child = fork(this.app.makePath('bin/console.ts'), args, {
+          cwd: fileURLToPath(this.app.appRoot),
+          execArgv: [
+            '--import=@poppinss/ts-exec',
+            '--enable-source-maps',
+            '--import=hot-hook/register',
+          ],
+          stdio: 'inherit',
+        })
+
+        const stop = () => {
+          restarting = false
+          child.kill('SIGTERM')
+        }
+        process.on('SIGINT', stop)
+        process.on('SIGTERM', stop)
+
+        child.on('message', (message: { type?: string }) => {
+          if (message?.type === 'hot-hook:full-reload' && !restarting) {
+            this.logger.info('Full reload required, restarting the worker')
+            restarting = true
+            child.kill('SIGTERM')
+          }
+        })
+
+        child.on('exit', (code) => {
+          process.off('SIGINT', stop)
+          process.off('SIGTERM', stop)
+
+          if (restarting) {
+            restarting = false
+            return start()
+          }
+
+          resolve(code ?? 0)
+        })
+      }
+
+      start()
+    })
+
+    this.exitCode = exitCode
+    await this.terminate()
   }
 }

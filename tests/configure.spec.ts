@@ -9,7 +9,7 @@
 
 import { test } from '@japa/runner'
 import { fileURLToPath } from 'node:url'
-import { readdir } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { IgnitorFactory } from '@adonisjs/core/factories'
 import Configure from '@adonisjs/core/commands/configure'
@@ -26,12 +26,15 @@ test.group('Configure', (group) => {
 
     await context.fs.create('.env', '')
     await context.fs.createJson('tsconfig.json', {})
+    await context.fs.createJson('package.json', {
+      imports: { '#controllers/*': './app/controllers/*.js' },
+    })
     await context.fs.create('start/env.ts', `export default Env.create(new URL('./'), {})`)
     await context.fs.create('adonisrc.ts', `export default defineConfig({})`)
     await context.fs.create('database/migrations/.gitkeep', '')
   })
 
-  test('should register provider and command', async ({ assert }) => {
+  test('should register provider, command and #jobs import alias', async ({ assert }) => {
     const ignitor = new IgnitorFactory()
       .withCoreProviders()
       .withCoreConfig()
@@ -58,6 +61,12 @@ test.group('Configure', (group) => {
     await assert.fileExists('adonisrc.ts')
     await assert.fileContains('adonisrc.ts', '@adonisjs/queue/queue_provider')
     await assert.fileContains('adonisrc.ts', '@adonisjs/queue/commands')
+
+    const { imports } = JSON.parse(await readFile(join(BASE_PATH, 'package.json'), 'utf-8'))
+    assert.deepEqual(imports, {
+      '#controllers/*': './app/controllers/*.js',
+      '#jobs/*': './app/jobs/*.js',
+    })
   })
 
   test('should create configuration file', async ({ assert }) => {

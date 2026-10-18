@@ -45,6 +45,11 @@ export async function configure(command: Configure) {
   })
 
   /**
+   * Register the "#jobs" import alias used to reference job classes
+   */
+  await codemods.addImportAlias('#jobs/*', './app/jobs/*.js')
+
+  /**
    * Define environment variables
    */
   await codemods.defineEnvVariables({ QUEUE_DRIVER: driver })

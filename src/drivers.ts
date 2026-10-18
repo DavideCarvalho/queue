@@ -16,6 +16,7 @@ import type { RedisConnections } from '@adonisjs/redis/types'
 import type { AdapterFactory } from '@boringnode/queue/types'
 import type { Kysely } from 'kysely'
 import type { KyselyAdapterOptions } from '@boringnode/queue/drivers/kysely_adapter'
+import { sqlStorageMigration, withStorageMigration } from './storage_migration.js'
 
 /**
  * Queue drivers that integrate with AdonisJS services.
@@ -66,19 +67,37 @@ export const drivers: {
   database(config) {
     return configProvider.create(async (app) => {
       const db = await app.container.make('lucid.db')
-      const { knex } = await import('@boringnode/queue/drivers/knex_adapter')
+      const { knex, KnexQueueSchemaService } =
+        await import('@boringnode/queue/drivers/knex_adapter')
 
       const connectionName = config?.connectionName || db.primaryConnectionName
-      const connection = db.connection(connectionName)
+      const client = db.connection(connectionName).getWriteClient()
+      const dialect = client.client.dialect as string
 
-      return knex(connection.getWriteClient(), config?.tableName)
+      return withStorageMigration(
+        knex(client, config?.tableName),
+        sqlStorageMigration(new KnexQueueSchemaService(client), {
+          jobsTable: config?.tableName ?? 'queue_jobs',
+          schedulesTable: 'queue_schedules',
+          wallClockDates: dialect === 'mysql' || dialect === 'mysql2',
+        })
+      )
     })
   },
 
   kysely(connection, options) {
     return configProvider.create(async () => {
-      const { kysely: kyselyAdapter } = await import('@boringnode/queue/drivers/kysely_adapter')
-      return kyselyAdapter(connection, options)
+      const { kysely: kyselyAdapter, KyselyQueueSchemaService } =
+        await import('@boringnode/queue/drivers/kysely_adapter')
+
+      return withStorageMigration(
+        kyselyAdapter(connection, options),
+        sqlStorageMigration(new KyselyQueueSchemaService(connection, options), {
+          jobsTable: options.tableName ?? 'queue_jobs',
+          schedulesTable: options.schedulesTableName ?? 'queue_schedules',
+          wallClockDates: options.dialect !== 'sqlite',
+        })
+      )
     })
   },
 

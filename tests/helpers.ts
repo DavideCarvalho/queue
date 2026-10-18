@@ -10,6 +10,7 @@
 import { getActiveTest } from '@japa/runner'
 import { IgnitorFactory } from '@adonisjs/core/factories'
 import type { AppEnvironments } from '@adonisjs/core/types/app'
+import type { DatabaseConfig } from '@adonisjs/lucid/types/database'
 
 import { defineConfig, drivers } from '../index.js'
 
@@ -19,6 +20,7 @@ export async function setupApp(
   env?: AppEnvironments,
   config: {
     queue?: ReturnType<typeof defineConfig>
+    database?: DatabaseConfig
   } = {}
 ) {
   const ignitor = new IgnitorFactory()
@@ -34,9 +36,13 @@ export async function setupApp(
               sync: drivers.sync(),
             },
           }),
+        database: config.database,
       },
       rcFileContents: {
-        providers: [() => import('../providers/queue_provider.js')],
+        providers: [
+          ...(config.database ? [() => import('@adonisjs/lucid/database_provider')] : []),
+          () => import('../providers/queue_provider.js'),
+        ],
       },
     })
     .create(BASE_URL, {

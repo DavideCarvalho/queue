@@ -13,9 +13,7 @@ export default defineConfig({
       connectionName: 'main',
     }),
 {{#elif driver === 'database'}}
-    database: drivers.database({
-      connectionName: 'primary',
-    }),
+    database: drivers.database(),
 {{/if}}
     sync: drivers.sync(),
   },

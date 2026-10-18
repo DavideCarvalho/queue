@@ -245,4 +245,31 @@ test.group('Provider', (group) => {
       Worker.prototype.start = originalStart
     }
   })
+
+  test('queue:work --all-queues processes every configured queue', async ({ assert }) => {
+    const { Worker } = await import('@boringnode/queue')
+    const originalStart = Worker.prototype.start
+    let processedQueues: string[] = []
+
+    Worker.prototype.start = async (queues: string[]) => {
+      processedQueues = queues
+    }
+
+    try {
+      const app = await setupApp('console', {
+        queue: defineConfig({
+          default: 'sync',
+          adapters: { sync: sync() },
+          queues: { emails: {}, reports: { adapter: 'sync' } },
+        }),
+      })
+      const ace = await app.container.make('ace')
+      const command = await ace.create(QueueWork, ['--all-queues'])
+      await command.exec()
+
+      assert.deepEqual(processedQueues, ['default', 'emails', 'reports'])
+    } finally {
+      Worker.prototype.start = originalStart
+    }
+  })
 })

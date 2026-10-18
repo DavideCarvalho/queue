@@ -24,6 +24,9 @@ export default class QueueWork extends BaseCommand {
   @flags.string({ description: 'Comma-separated list of queues to process', alias: 'q' })
   declare queue?: string
 
+  @flags.boolean({ description: 'Process the default queue and every queue of the config' })
+  declare allQueues?: boolean
+
   @flags.number({ description: 'Number of jobs to process concurrently', alias: 'c' })
   declare concurrency?: number
 
@@ -31,6 +34,12 @@ export default class QueueWork extends BaseCommand {
   declare adapter?: string
 
   async run() {
+    if (this.queue && this.allQueues) {
+      this.logger.error('Cannot use --queue and --all-queues flags together. Choose one of them')
+      this.exitCode = 1
+      return
+    }
+
     const { Worker } = await import('@boringnode/queue')
     const config = this.app.config.get<QueueConfig>('queue')
     const queueManager = await this.app.container.make('queue.manager')
@@ -45,7 +54,11 @@ export default class QueueWork extends BaseCommand {
     router.commit()
 
     const resolvedAdapters = await resolveAdapters(config, this.app)
-    const queues = this.queue ? this.queue.split(',').map((q) => q.trim()) : ['default']
+    const queues = this.queue
+      ? this.queue.split(',').map((q) => q.trim())
+      : this.allQueues
+        ? [...new Set(['default', ...Object.keys(config.queues ?? {})])]
+        : ['default']
 
     await queueManager.loadJobs()
 

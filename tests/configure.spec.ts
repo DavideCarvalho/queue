@@ -34,7 +34,7 @@ test.group('Configure', (group) => {
     await context.fs.create('database/migrations/.gitkeep', '')
   })
 
-  test('should register provider, command and #jobs import alias', async ({ assert }) => {
+  test('should register provider, command and jobs directory with alias', async ({ assert }) => {
     const ignitor = new IgnitorFactory()
       .withCoreProviders()
       .withCoreConfig()
@@ -61,6 +61,8 @@ test.group('Configure', (group) => {
     await assert.fileExists('adonisrc.ts')
     await assert.fileContains('adonisrc.ts', '@adonisjs/queue/queue_provider')
     await assert.fileContains('adonisrc.ts', '@adonisjs/queue/commands')
+
+    await assert.dirExists('app/jobs')
 
     const { imports } = JSON.parse(await readFile(join(BASE_PATH, 'package.json'), 'utf-8'))
     assert.deepEqual(imports, {

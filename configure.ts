@@ -45,8 +45,10 @@ export async function configure(command: Configure) {
   })
 
   /**
-   * Register the "#jobs" import alias used to reference job classes
+   * Create the jobs directory and register the "#jobs" import alias
+   * used to reference job classes
    */
+  await codemods.createDirectory('app/jobs')
   await codemods.addImportAlias('#jobs/*', './app/jobs/*.js')
 
   /**

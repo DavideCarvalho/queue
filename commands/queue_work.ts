@@ -63,10 +63,22 @@ export default class QueueWork extends BaseCommand {
 
     const worker = new Worker(workerConfig)
 
+    /**
+     * The app terminates on SIGTERM (see bin/console.ts). Stop the worker
+     * first, or the provider would destroy the QueueManager under it.
+     */
+    this.app.terminating(() => worker.stop())
+
+    /**
+     * `start()` resolves once the worker stopped (SIGTERM, SIGINT) and every
+     * running job is finalized. Terminating the app then destroys the
+     * QueueManager and closes the connections it used (Redis, Lucid), so
+     * the process can exit.
+     */
     try {
       await worker.start(queues)
     } finally {
-      await queueManager.destroy()
+      await this.terminate()
     }
   }
 }

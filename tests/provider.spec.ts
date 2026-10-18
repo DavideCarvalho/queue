@@ -163,6 +163,7 @@ test.group('Provider', (group) => {
     try {
       await QueueWork.prototype.run.call({
         app: {
+          terminating() {},
           config: {
             get() {
               return config
@@ -174,9 +175,6 @@ test.group('Provider', (group) => {
                 return {
                   async loadJobs() {
                     order.push('loadJobs')
-                  },
-                  async destroy() {
-                    order.push('destroy')
                   },
                 }
               }
@@ -200,11 +198,51 @@ test.group('Provider', (group) => {
         logger: {
           info() {},
         },
+        async terminate() {
+          order.push('terminate')
+        },
       })
     } finally {
       Worker.prototype.start = originalStart
     }
 
-    assert.deepEqual(order, ['router', 'loadJobs', 'start', 'destroy'])
+    assert.deepEqual(order, ['router', 'loadJobs', 'start', 'terminate'])
+  })
+  test('queue:work stops the worker before the app terminates', async ({ assert }) => {
+    const { Worker } = await import('@boringnode/queue')
+    const originalStart = Worker.prototype.start
+    let started!: () => void
+    const workerStarted = new Promise<void>((resolve) => (started = resolve))
+
+    Worker.prototype.start = function (this: InstanceType<typeof Worker>, queues: string[]) {
+      started()
+      return originalStart.call(this, queues)
+    }
+
+    try {
+      const app = await setupApp('console', {
+        queue: defineConfig({
+          default: 'sync',
+          adapters: { sync: sync() },
+          worker: { idleDelay: '10ms' },
+        }),
+      })
+      const ace = await app.container.make('ace')
+      const command = await ace.create(QueueWork, [])
+      const execution = command.exec()
+
+      await workerStarted
+
+      /**
+       * What bin/console.ts does on SIGTERM
+       */
+      await app.terminate()
+      await execution
+
+      assert.isUndefined(command.error)
+      assert.equal(app.getState(), 'terminated')
+    } finally {
+      Worker.prototype.start = originalStart
+    }
   })
 })
